@@ -1,0 +1,20 @@
+{
+  "name": "supercharged-flaky-gating",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:stable": "playwright test --project=stable",
+    "test:experimental": "playwright test --project=experimental",
+    "test:quarantine": "playwright test --project=quarantine",
+    "graduate": "node scripts/graduate.mjs",
+    "graduate:demo": "node scripts/graduate.mjs --repeat-each 5"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@playwright/test": "1.49.1"
+  }
+}

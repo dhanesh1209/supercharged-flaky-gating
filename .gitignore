@@ -1,0 +1,7 @@
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+.graduation-history.json
+.DS_Store
