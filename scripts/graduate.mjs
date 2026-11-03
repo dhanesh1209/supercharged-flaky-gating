@@ -38,8 +38,11 @@ if (fs.existsSync(HISTORY_FILE)) {
 console.log(`[Graduate] Running experimental tests (repeat count: ${repeatCount})...`);
 
 // Run experimental tests via Playwright
-// For the local graduation demo shortcut, we stabilize the flaky test
+// DEMO SHORTCUT: the experimental test is deliberately flaky (it fails randomly).
+// Here it is forced to pass so the promotion can be shown in one local run.
+// A real promotion needs 5 clean CI runs in a row. This is stated in the README.
 const env = { ...process.env, STABILIZE_FLAKY: 'true' };
+console.log('[Graduate] DEMO SHORTCUT: the flaky test is forced to pass for this run (STABILIZE_FLAKY=true).');
 const cmd = `npx playwright test --project=experimental --repeat-each=${repeatCount} --reporter=json`;
 
 let stdout = '';
@@ -110,7 +113,9 @@ for (const [title, runs] of testResultsMap.entries()) {
   let testStreakFailed = false;
 
   for (const run of runs) {
-    // Clean run definition: first-attempt pass, retry === 0, status === 'passed', zero residue
+    // Clean run = first-attempt pass (retry === 0, status 'passed') + no leftover test data or state.
+    // The residue check lives in the tests: afterEach fails the test if any state is left behind,
+    // so a passed test here has already passed the residue check.
     const isClean = run.status === 'passed' && run.retry === 0;
 
     if (isClean) {
@@ -130,25 +135,18 @@ for (const [title, runs] of testResultsMap.entries()) {
 
     // Promote in test file
     let testContent = fs.readFileSync(TEST_FILE, 'utf8');
-    // Replace tag in file for this test
-    if (testContent.includes(title)) {
-      // Find the test block and replace @experimental with @stable
-      const testRegex = new RegExp(`(test\\(['"]${title}['"],\\s*\\{[^}]*tag:\\s*['"])@experimental(['"])`, 'g');
-      if (testRegex.test(testContent)) {
-        testContent = testContent.replace(testRegex, '$1@stable$2');
-        fs.writeFileSync(TEST_FILE, testContent, 'utf8');
-        console.log(`>>> Successfully updated ${TEST_FILE} tag to @stable`);
-        history[title].status = 'stable';
-        promotedAny = true;
-      } else {
-        // Fallback replacement of @experimental token
-        const fallbackRegex = new RegExp(`(@experimental)`, 'g');
-        testContent = testContent.replace(fallbackRegex, '@stable');
-        fs.writeFileSync(TEST_FILE, testContent, 'utf8');
-        console.log(`>>> Updated tag in ${TEST_FILE} to @stable`);
-        history[title].status = 'stable';
-        promotedAny = true;
-      }
+    // Change the tag of this one test only: match its title, then the tag inside its details object
+    const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const testRegex = new RegExp(`(test\\((['"])${escapedTitle}\\2,\\s*\\{[^}]*tag:\\s*['"])@experimental(['"])`);
+    if (testRegex.test(testContent)) {
+      testContent = testContent.replace(testRegex, '$1@stable$3');
+      fs.writeFileSync(TEST_FILE, testContent, 'utf8');
+      console.log(`>>> Successfully updated ${TEST_FILE} tag to @stable`);
+      history[title].status = 'stable';
+      promotedAny = true;
+    } else {
+      // No blanket replace: never touch other tests. Ask for a manual tag change instead.
+      console.log(`>>> Could not find "${title}" tagged @experimental in ${TEST_FILE}. Change its tag to @stable by hand.`);
     }
   } else {
     console.log(`>>> Current streak: ${history[title].consecutiveCleanRuns}/${REQUIRED_CONSECUTIVE_RUNS}. More clean runs required before promotion.`);
