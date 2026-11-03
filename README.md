@@ -24,6 +24,17 @@ This model separates tests into three tiers:
   - Retries: **0**.
   - Purpose: Isolates broken tests for future fixes without deleting them or ignoring build failures.
 
+### What counts as a clean run
+
+A run is clean only if the test **passed on its first attempt (no retry)** and the run **left no test data or state behind** (a cart, a user, a created record). The tests check this themselves in `afterEach`, so a leftover cart makes the test fail.
+
+### The flaky test
+
+The `@experimental` test (`user can sort products by price`) is **deliberately flaky**. It fails at random, about 4 times in 10, so you can see the model work. Two switches change that:
+
+- `FLAKY_FAIL=true` forces it to fail (the pull request demo uses this).
+- `STABILIZE_FLAKY=true` forces it to pass (the graduate demo uses this).
+
 ---
 
 ## 2. How to Run It
@@ -55,15 +66,17 @@ npm test
 
 ### Run the Graduate Script
 
-The graduate script monitors experimental test runs, records clean execution streaks (first-attempt pass, zero retries, zero leftover residue), and automatically promotes tests to `@stable` once 5 consecutive clean runs are reached.
+The graduate script runs the experimental tests, counts clean runs in a row (first-attempt pass, no retry, no leftover state), and changes a test's tag to `@stable` after 5 clean runs in a row.
 
 ```bash
-# Local demo shortcut (runs 5 repetitions in one go)
+# Local demo shortcut: 5 repeats in one go, with the flaky test forced to pass
 npm run graduate:demo
 
-# Single run check (for CI streak tracking)
+# One run, counted locally in .graduation-history.json (not committed)
 npm run graduate
 ```
+
+The streak is saved only on your machine. No CI job runs the script, so this repo does not track a streak across CI builds.
 
 ---
 
@@ -80,8 +93,8 @@ When a pull request runs, GitHub Actions displays three parallel jobs:
 | `quarantine` | `continue-on-error: true` | No | No |
 
 - **`stable` is green**: The pull request can be merged, even if `experimental` or `quarantine` are failing.
-- **`experimental` or `quarantine` are failing**: The checks display with warning indicators on GitHub without failing the overall pull request check or blocking the merge button.
-- **`stable` is red**: The pull request is blocked until the stable test suite passes.
+- **`experimental` or `quarantine` are failing**: Those two jobs show as failed on the pull request, but the workflow run still finishes as a success and they are not required checks, so they do not stop the merge. (Seen on pull request #1: stable passed, the other two failed, the run was a success.)
+- **`stable` is red**: The required check fails, and GitHub blocks the merge for people the branch rule applies to. Note: `enforce_admins` is off in this repo, so the repo owner can still merge. Turn it on if you want the rule to apply to admins too.
 
 ### Branch Protection Configuration
 
@@ -96,5 +109,6 @@ To enforce this gating model in GitHub:
 
 ## Honesty Note & Practice-Site Caveat
 
-- **Repeat Shortcut Note**: Using `--repeat-each 5` in `npm run graduate:demo` is a local demonstration shortcut to simulate 5 passes quickly. In production practice, the rule requires 5 clean runs in a row across independent CI builds over time.
+- **Repeat Shortcut Note**: Using `--repeat-each 5` in `npm run graduate:demo` is a local demonstration shortcut to simulate 5 passes quickly. The real rule needs 5 clean CI runs in a row, across separate builds over time.
+- **Forced pass in the graduate demo**: `npm run graduate:demo` forces the flaky test to pass (`STABILIZE_FLAKY=true`), so it always graduates. That shows how promotion works. It does not show that the test became reliable.
 - **Target Site Caveat**: This demo runs against `saucedemo.com` solely as a public web application target for testing workflows. It is not affiliated with the site, and the site is not described as official or free to use.
